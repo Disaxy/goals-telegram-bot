@@ -10,8 +10,12 @@ from smiles import Smile
 
 class Keyboard:
 
-    @staticmethod
-    def welcome():
+    back_btn = InlineKeyboardButton(
+        text=Smile.back + ' Назад', callback_data='back')
+    home_btn = InlineKeyboardButton(
+        text=Smile.home + ' Домой', callback_data='home')
+
+    def welcome(self):
         kb = InlineKeyboardMarkup(row_width=2)
         setting_btn = InlineKeyboardButton(
             text=Smile.settings + ' Настройки', callback_data='settings')
@@ -33,88 +37,74 @@ class Keyboard:
                listen_btn, budget_btn, setting_btn)
         return kb
 
-    @staticmethod
-    def goals():
+    def goals(self):
         kb = InlineKeyboardMarkup(row_width=2)
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+        kb.add(self.back_btn)
         return kb
 
-    @staticmethod
-    def regime():
+    def regime(self):
         kb = InlineKeyboardMarkup(row_width=2)
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+        kb.add(self.back_btn)
         return kb
 
-    @staticmethod
-    def diet():
+    def diet(self):
         kb = InlineKeyboardMarkup(row_width=2)
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+        kb.add(self.back_btn)
         return kb
 
-    @staticmethod
-    def water():
+    def water(self):
         kb = InlineKeyboardMarkup(row_width=2)
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+        kb.add(self.back_btn)
         return kb
 
-    @staticmethod
-    def sport():
+    def sport(self):
         kb = InlineKeyboardMarkup(row_width=2)
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+        kb.add(self.back_btn)
         return kb
 
-    @staticmethod
-    def listen():
+    def listen(self):
         kb = InlineKeyboardMarkup(row_width=2)
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+        kb.add(self.back_btn)
         return kb
 
-    @staticmethod
-    def budget():
+    def budget(self):
         kb = InlineKeyboardMarkup(row_width=2)
+        today_btn = InlineKeyboardButton(
+            text=Smile.bugdet_today + ' За сегодня', callback_data='bugdet_today')
+        month_btn = InlineKeyboardButton(
+            text=Smile.budget_month + ' За месяц', callback_data='budget_month')
+        expenses_btn = InlineKeyboardButton(
+            text=Smile.budget_expenses + ' Последние траты', callback_data='budget_expenses')
         add_btn = InlineKeyboardButton(
-            text=Smile.budget_add + ' Добавить', callback_data='budget_add'
-        )
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(add_btn, back_btn)
+            text=Smile.budget_add + ' Добавить', callback_data='budget_add')
+        kb.row(expenses_btn)
+        kb.add(today_btn, month_btn, add_btn, self.back_btn)
         return kb
 
-    @staticmethod
-    def budget_category():
+    def budget_category(self):
         kb = InlineKeyboardMarkup(row_width=1)
         for cat in category:
             kb.add(InlineKeyboardButton(
-                text=cat.name, callback_data=cat.name.replace(' ', '_')))
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+                text=cat.name, callback_data=cat.name))
+        kb.row(self.home_btn, self.back_btn)
         return kb
 
-    @staticmethod
-    def budget_amount():
+    def budget_amount(self):
         kb = InlineKeyboardMarkup(row_width=2)
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+        kb.add(self.home_btn, self.back_btn)
         return kb
 
-    @staticmethod
-    def settings():
+    def budget_success(self):
         kb = InlineKeyboardMarkup(row_width=2)
-        back_btn = InlineKeyboardButton(
-            text=Smile.back + ' Назад', callback_data='back')
-        kb.add(back_btn)
+        category_btn = InlineKeyboardButton(
+            text=Smile.budget_category_change + ' Изменить категорию', callback_data='budget_add')
+        budget_btn = InlineKeyboardButton(
+            text=Smile.budget + ' Бюджет', callback_data='budget')
+        kb.row(category_btn)
+        kb.add(self.home_btn, budget_btn)
+        return kb
+
+    def settings(self):
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(self.back_btn)
         return kb

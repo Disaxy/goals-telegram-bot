@@ -1,9 +1,9 @@
 
 from datetime import datetime
-from pprint import pprint
 
 import apiclient.discovery
 import httplib2
+import pytz
 from oauth2client.service_account import ServiceAccountCredentials
 
 
@@ -11,6 +11,7 @@ class SpreadSheet:
 
     def __init__(self, credentials_file: str, spreadsheet_id: str):
         self.spreadsheet_id = spreadsheet_id
+        self.tz = pytz.timezone('Europe/Moscow')
 
         credentials = ServiceAccountCredentials.from_json_keyfile_name(
             credentials_file, [
@@ -22,12 +23,30 @@ class SpreadSheet:
         self.service = apiclient.discovery.build('sheets', 'v4', http=httpAuth)
 
     def view(self):
-        values = self.service.spreadsheets().values().get(
+        values = self.service.spreadsheets().values().batchGet(
             spreadsheetId=self.spreadsheet_id,
-            range='Дашборд!B2',
-            majorDimension='COLUMNS'
+            ranges=['Дашборд!B2', 'Дашборд!E4:E5',
+                    'Дашборд!J4:J6', 'Дашборд!L4'],
+            majorDimension='ROWS'
         ).execute()
-        pprint(values)
+
+        texts = [
+            'Статус:',
+            'Последние расходы внесены:',
+            'Средний расход за текущий месяц:',
+            'Повседневные:',
+            'Крупные:',
+            'Квартира:',
+            'Всего потрачено за весь период учета расходов:'
+        ]
+
+        list_values = []
+
+        for ranges in values['valueRanges']:
+            for r in ranges['values']:
+                list_values.append(r[0].replace('\xa0', ' '))
+
+        return [' '.join(x) for x in zip(texts, list_values)]
 
     def update(self):
         self.service.spreadsheets().values().batchUpdate(
@@ -56,7 +75,8 @@ class SpreadSheet:
             body={
                 "majorDimension": "ROWS",
                 "values": [
-                    [datetime.now().strftime('%d.%m.%Y'), category, amount, comment]
+                    [datetime.now(self.tz).strftime('%d.%m.%Y'),
+                     category, amount, comment]
                 ]
             }
         ).execute()

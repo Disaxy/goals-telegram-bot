@@ -44,7 +44,7 @@ logging.basicConfig(level=logging.INFO)
 
 uvloop.install()
 storage = MemoryStorage()
-bot = Bot(token=API_TOKEN, proxy=PROXY_URL)
+bot = Bot(token=API_TOKEN, proxy=PROXY_URL, parse_mode=ParseMode.MARKDOWN)
 dp = Dispatcher(bot=bot, storage=storage)
 dp.middleware.setup(AccessMiddleware(ADMIN))
 spreadsheets = SpreadSheet(GOOGLESHEETS_FILE, GOOGLESHEETS_SPREADSHEET_ID)
@@ -66,17 +66,23 @@ class Page(StatesGroup):
 
 @dp.message_handler(state='*', commands=['start'])
 async def send_welcome(message: types.Message):
-    await message.reply(text=Smile.welcome + ' Мои привычки.', reply_markup=Keyboard().welcome(), reply=False)
+    await message.answer(text=Smile.welcome + ' Мои привычки.', reply_markup=Keyboard().welcome())
     await Page.first()
 
 
-@dp.message_handler(state=Page.budget_add, content_types=['text'])
+@dp.message_handler(state=Page.budget_category, content_types=['text'])
 async def send_message(message: types.Message, state: FSMContext):
-    spreadsheets.append(message.text.split(' ')[0], message.text.split(' ')[1])
-    await message.reply(text='Успешно добавлено!', reply=False)
+    async with state.proxy() as data:
+        category = data.get('category')
+        amount = message.text.split(' ')[0]
+        comment = ' '.join(message.text.split(' ')[1:])
+
+    spreadsheets.append(category=category, amount=amount, comment=comment)
+
+    await message.answer(text=text('Успешно добавлено ' + bold(amount) + ' рублей в категорию ' + bold(category), 'Вы можете продолжать добавлять расходы в эту категорию или выбрать другую.', sep='\n\n'), reply_markup=Keyboard().budget_success())
 
 
-@dp.callback_query_handler(state=Page.welcome)
+@dp.callback_query_handler(lambda callback: callback.data not in ['home', 'back', 'budget_add'], state=[Page.welcome, Page.budget_category])
 async def welcome_handler(callback: types.CallbackQuery):
 
     if callback.data == 'goals':
@@ -100,7 +106,8 @@ async def welcome_handler(callback: types.CallbackQuery):
         await Page.regime.set()
 
     if callback.data == 'budget':
-        await callback.message.edit_text(text=Smile.budget + ' Мои расходы.', reply_markup=Keyboard().budget())
+        status = spreadsheets.view()
+        await callback.message.edit_text(text=text(bold(Smile.budget + ' Мои расходы'), code('\n'.join(status)), sep='\n\n'), reply_markup=Keyboard().budget())
         await Page.budget.set()
 
     if callback.data == 'water':
@@ -114,7 +121,7 @@ async def welcome_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query_handler(lambda callback: callback.data != 'back', state=Page.budget)
+@dp.callback_query_handler(lambda callback: callback.data not in ['back', 'home', 'budget'], state=[Page.budget, Page.budget_category])
 async def budget_handler(callback: types.CallbackQuery):
 
     if callback.data == 'budget_add':
@@ -124,22 +131,26 @@ async def budget_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query_handler(state=Page.budget_add)
-async def budget_add_handler(callback: types.CallbackQuery):
+@dp.callback_query_handler(lambda callback: callback.data != 'home', state=Page.budget_add)
+async def budget_add_handler(callback: types.CallbackQuery, state: FSMContext):
 
     if callback.data == 'back':
         await callback.message.edit_text(text=Smile.budget + ' Мои расходы.', reply_markup=Keyboard().budget())
         await Page.budget.set()
     else:
         for cat in category:
-            if callback.data == cat.name.replace(' ', '_'):
-                await callback.message.edit_text(text=cat.comment, reply_markup=Keyboard().budget_amount())
+            if callback.data == cat.name:
+                await callback.message.edit_text(text=text(bold(cat.comment), 'Введите сумму которую потратили и  комментарий (не обязательно).', code('Пример: 100 бутылка воды'), sep='\n\n'), reply_markup=Keyboard().budget_amount())
+
+                async with state.proxy() as data:
+                    data['category'] = cat.name[2:]
+
                 await Page.budget_category.set()
 
     await callback.answer()
 
 
-@dp.callback_query_handler(state=Page.budget_category)
+@dp.callback_query_handler(lambda callback: callback.data != 'home', state=Page.budget_category)
 async def budget_category_handler(callback: types.CallbackQuery):
 
     if callback.data == 'back':
@@ -149,10 +160,10 @@ async def budget_category_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query_handler(lambda callback: callback.data == 'back', state='*')
+@dp.callback_query_handler(lambda callback: callback.data in ['back', 'home'], state='*')
 async def back_handler(callback: types.CallbackQuery):
 
-    if callback.data == 'back':
+    if callback.data in ['back', 'home']:
         await callback.message.edit_text(text=Smile.welcome + ' Мои привычки.', reply_markup=Keyboard().welcome())
         await Page.first()
         await callback.answer()
