@@ -6,9 +6,8 @@ import os
 from configparser import ConfigParser
 from exceptions import NotCorrectMessage
 
-import uvloop
 from aiogram import Bot, Dispatcher, types
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.contrib.fsm_storage.files import PickleStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
@@ -17,12 +16,12 @@ from aiogram.utils.executor import start_webhook
 from aiogram.utils.markdown import bold, code, italic, pre, text
 
 from budget import category
-from google_sheet import SpreadSheet
+from google_sheet import SpreadSheet, Calendar
 from keyboards import Keyboard
 from middlewares import AccessMiddleware
 from smiles import Smile
 
-
+fsm_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.data')
 config_path = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), 'config.cfg')
 config = ConfigParser()
@@ -33,8 +32,8 @@ PROXY_URL = config.get('PROXY', 'URL')
 WEBHOOK_HOST = config.get('WEBHOOK', 'HOST')
 WEBAPP_HOST = config.get('APP', 'HOST')
 WEBAPP_PORT = config.get('APP', 'PORT')
-GOOGLESHEETS_FILE = config.get('GOOGLESHEETS', 'FILE')
-GOOGLESHEETS_SPREADSHEET_ID = config.get('GOOGLESHEETS', 'SPREADSHEET_ID')
+GOOGLE_FILE = config.get('GOOGLE', 'FILE')
+GOOGLE_SPREADSHEET_ID = config.get('GOOGLE', 'SPREADSHEET_ID')
 ADMIN = config.get('ADMIN', 'ID')
 
 WEBHOOK_PATH = '/' + API_TOKEN
@@ -42,12 +41,12 @@ WEBHOOK_URL = f'{WEBHOOK_HOST}{WEBHOOK_PATH}'
 
 logging.basicConfig(level=logging.INFO)
 
-uvloop.install()
-storage = MemoryStorage()
+storage = PickleStorage(fsm_path)
 bot = Bot(token=API_TOKEN, proxy=PROXY_URL, parse_mode=ParseMode.MARKDOWN)
 dp = Dispatcher(bot=bot, storage=storage)
 dp.middleware.setup(AccessMiddleware(ADMIN))
-spreadsheets = SpreadSheet(GOOGLESHEETS_FILE, GOOGLESHEETS_SPREADSHEET_ID)
+spreadsheets = SpreadSheet(GOOGLE_FILE, GOOGLE_SPREADSHEET_ID)
+calendar = Calendar(GOOGLE_FILE)
 
 
 class Page(StatesGroup):
@@ -66,7 +65,7 @@ class Page(StatesGroup):
 
 @dp.message_handler(state='*', commands=['start'])
 async def send_welcome(message: types.Message):
-    await message.answer(text=Smile.welcome + ' Мои привычки.', reply_markup=Keyboard().welcome())
+    await message.answer(text=text(Smile.welcome + ' Мои привычки'), reply_markup=Keyboard().welcome())
     await Page.first()
 
 
@@ -102,6 +101,7 @@ async def welcome_handler(callback: types.CallbackQuery):
         await Page.listen.set()
 
     if callback.data == 'regime':
+        calendar.view()
         await callback.message.edit_text(text=Smile.regime + ' Мой режим дня.', reply_markup=Keyboard().regime())
         await Page.regime.set()
 

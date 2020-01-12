@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
+from typing import NamedTuple
 
-class Smile:
+
+class Smile(NamedTuple):
     welcome = '💥'
     goals = '🏆'
     diet = '🥕'

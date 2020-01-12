@@ -1,7 +1,8 @@
 
 from datetime import datetime
+from time import time
 
-import apiclient.discovery
+import apiclient
 import httplib2
 import pytz
 from oauth2client.service_account import ServiceAccountCredentials
@@ -20,7 +21,8 @@ class SpreadSheet:
             ])
         httpAuth = credentials.authorize(httplib2.Http())
 
-        self.service = apiclient.discovery.build('sheets', 'v4', http=httpAuth)
+        self.service = apiclient.discovery.build(
+            'sheets', 'v4', http=httpAuth, cache_discovery=False)
 
     def view(self):
         values = self.service.spreadsheets().values().batchGet(
@@ -80,3 +82,32 @@ class SpreadSheet:
                 ]
             }
         ).execute()
+
+
+class Calendar:
+
+    def __init__(self, credentials_file: str):
+        credentials = ServiceAccountCredentials.from_json_keyfile_name(
+            credentials_file, [
+                'https://www.googleapis.com/auth/calendar'
+            ])
+        httpAuth = credentials.authorize(httplib2.Http())
+
+        self.service = apiclient.discovery.build(
+            'calendar', 'v3', http=httpAuth, cache_discovery=False)
+
+    def view(self):
+        now = datetime.utcnow().isoformat() + 'Z'
+        now_1day = round(time())+86400  # плюс сутки
+        now_1day = datetime.fromtimestamp(now_1day).isoformat() + 'Z'
+
+        events_result = self.service.events().list(calendarId='gdemoinap@gmail.com', timeMin=now, timeMax=now_1day,
+                                                   maxResults=50, singleEvents=True,
+                                                   orderBy='startTime').execute()
+        events = events_result.get('items', [])
+
+        if not events:
+            print('No upcoming events found.')
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            print(start, event['summary'])
