@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from aiogram.types import (InlineKeyboardButton, InlineKeyboardMarkup,
-                           KeyboardButton, ReplyKeyboardMarkup,
-                           ReplyKeyboardRemove)
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from budget import category
 from smiles import Smile
 
 
@@ -14,6 +11,9 @@ class Keyboard:
         text=Smile.back + ' Назад', callback_data='back')
     home_btn = InlineKeyboardButton(
         text=Smile.home + ' Домой', callback_data='home')
+
+    def __init__(self, category_list: list):
+        self.category = category_list
 
     def welcome(self):
         kb = InlineKeyboardMarkup(row_width=2)
@@ -83,7 +83,7 @@ class Keyboard:
 
     def budget_category(self):
         kb = InlineKeyboardMarkup(row_width=1)
-        for cat in category:
+        for cat in self.category:
             kb.add(InlineKeyboardButton(
                 text=cat.name, callback_data=cat.name))
         kb.row(self.home_btn, self.back_btn)

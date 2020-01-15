@@ -13,7 +13,6 @@ class Expense(NamedTuple):
     comment: str = None
 
 
-
 @asyncinit
 class DB:
 
@@ -21,7 +20,7 @@ class DB:
         self.db_path = db_path
         self.init_path = init_path
         await self.__check_db()
-    
+
     async def __check_db(self):
         async with connect(self.db_path) as db:
             async with db.execute('SELECT name FROM `sqlite_master` WHERE type="table" AND name="expense"') as cursor:
@@ -65,6 +64,11 @@ class DB:
             await db.execute('DELETE FROM `expense` WHERE id = (SELECT id FROM `expense` ORDER BY id DESC LIMIT 1)')
             await db.commit()
 
+    async def get_categories(self):
+        async with connect(self.db_path) as db:
+            async with db.execute('SELECT name, description FROM `category`') as cursor:
+                return await cursor.fetchall()
+
 
 async def main():
     import os
@@ -74,11 +78,12 @@ async def main():
         os.path.abspath(__file__)), 'init.sql')
     db = await DB(db_path, init_path)
     # await db.check_db()
-    await db.create_expense(Expense(category='Продукты', amount=100))
+    # await db.create_expense(Expense(category='Продукты', amount=100))
     # await db.remove_expense(5)
     # await db.remove_last_expense()
-    await db.view_expense()
+    # await db.view_expense()
     # await db.last_day()
+    print(await db.get_categories())
 
 if __name__ == '__main__':
     asyncio.run(main())

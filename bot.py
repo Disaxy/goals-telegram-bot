@@ -15,15 +15,17 @@ from aiogram.types import ParseMode
 from aiogram.utils.executor import start_webhook
 from aiogram.utils.markdown import bold, code, italic, pre, text
 
-from budget import category
-from google_sheet import SpreadSheet, Calendar
+from db import DB
+from google_sheet import Calendar, SpreadSheet
 from keyboards import Keyboard
 from middlewares import AccessMiddleware
 from smiles import Smile
 
-fsm_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.data')
-config_path = os.path.join(os.path.dirname(
-    os.path.abspath(__file__)), 'config.cfg')
+work_dir = os.path.dirname(os.path.abspath(__file__))
+fsm_path = os.path.join(work_dir, '.data')
+config_path = os.path.join(work_dir, 'config.cfg')
+db_path = os.path.join(work_dir, '.sqlite')
+init_path = os.path.join(work_dir, 'init.sql')
 config = ConfigParser()
 config.read(config_path)
 
@@ -63,9 +65,21 @@ class Page(StatesGroup):
     settings = State()
 
 
+async def init_app(dp: Dispatcher):
+    db = await DB(db_path, init_path)
+    category = await db.get_categories()
+    kb = Keyboard(category)
+
+    await dp.storage.set_bucket(user=ADMIN, bucket={
+        "db": db,
+        "category": category,
+        "kb": kb
+    })
+
+
 @dp.message_handler(state='*', commands=['start'])
-async def send_welcome(message: types.Message):
-    await message.answer(text=text(Smile.welcome + ' Мои привычки'), reply_markup=Keyboard().welcome())
+async def send_welcome(message: types.Message, state: FSMContext):
+    await message.answer(text=text(Smile.welcome + ' Мои привычки'), reply_markup=kb.welcome())
     await Page.first()
 
 
@@ -78,44 +92,44 @@ async def send_message(message: types.Message, state: FSMContext):
 
     spreadsheets.append(category=category, amount=amount, comment=comment)
 
-    await message.answer(text=text('Успешно добавлено ' + bold(amount) + ' рублей в категорию ' + bold(category), 'Вы можете продолжать добавлять расходы в эту категорию или выбрать другую.', sep='\n\n'), reply_markup=Keyboard().budget_success())
+    await message.answer(text=text('Успешно добавлено ' + bold(amount) + ' рублей в категорию ' + bold(category), 'Вы можете продолжать добавлять расходы в эту категорию или выбрать другую.', sep='\n\n'), reply_markup=kb.budget_success())
 
 
 @dp.callback_query_handler(lambda callback: callback.data not in ['home', 'back', 'budget_add'], state=[Page.welcome, Page.budget_category])
 async def welcome_handler(callback: types.CallbackQuery):
 
     if callback.data == 'goals':
-        await callback.message.edit_text(text=Smile.goals + ' Мои цели.', reply_markup=Keyboard().goals())
+        await callback.message.edit_text(text=Smile.goals + ' Мои цели.', reply_markup=kb.goals())
         await Page.goals.set()
 
     if callback.data == 'diet':
-        await callback.message.edit_text(text=Smile.diet + ' Мое питание.', reply_markup=Keyboard().diet())
+        await callback.message.edit_text(text=Smile.diet + ' Мое питание.', reply_markup=kb.diet())
         await Page.diet.set()
 
     if callback.data == 'sport':
-        await callback.message.edit_text(text=Smile.sport + ' Мои тренировки.', reply_markup=Keyboard().sport())
+        await callback.message.edit_text(text=Smile.sport + ' Мои тренировки.', reply_markup=kb.sport())
         await Page.sport.set()
 
     if callback.data == 'listen':
-        await callback.message.edit_text(text=Smile.listen + ' Мои книги.', reply_markup=Keyboard().listen())
+        await callback.message.edit_text(text=Smile.listen + ' Мои книги.', reply_markup=kb.listen())
         await Page.listen.set()
 
     if callback.data == 'regime':
         calendar.view()
-        await callback.message.edit_text(text=Smile.regime + ' Мой режим дня.', reply_markup=Keyboard().regime())
+        await callback.message.edit_text(text=Smile.regime + ' Мой режим дня.', reply_markup=kb.regime())
         await Page.regime.set()
 
     if callback.data == 'budget':
         status = spreadsheets.view()
-        await callback.message.edit_text(text=text(bold(Smile.budget + ' Мои расходы'), code('\n'.join(status)), sep='\n\n'), reply_markup=Keyboard().budget())
+        await callback.message.edit_text(text=text(bold(Smile.budget + ' Мои расходы'), code('\n'.join(status)), sep='\n\n'), reply_markup=kb.budget())
         await Page.budget.set()
 
     if callback.data == 'water':
-        await callback.message.edit_text(text=Smile.water + ' Мой питьевой режим.', reply_markup=Keyboard().water())
+        await callback.message.edit_text(text=Smile.water + ' Мой питьевой режим.', reply_markup=kb.water())
         await Page.water.set()
 
     if callback.data == 'settings':
-        await callback.message.edit_text(text=Smile.settings + ' Мои настройки.', reply_markup=Keyboard().settings())
+        await callback.message.edit_text(text=Smile.settings + ' Мои настройки.', reply_markup=kb.settings())
         await Page.settings.set()
 
     await callback.answer()
@@ -125,7 +139,7 @@ async def welcome_handler(callback: types.CallbackQuery):
 async def budget_handler(callback: types.CallbackQuery):
 
     if callback.data == 'budget_add':
-        await callback.message.edit_text(text='Выберите категорию.', reply_markup=Keyboard().budget_category())
+        await callback.message.edit_text(text='Выберите категорию.', reply_markup=kb.budget_category())
         await Page.budget_add.set()
 
     await callback.answer()
@@ -135,12 +149,12 @@ async def budget_handler(callback: types.CallbackQuery):
 async def budget_add_handler(callback: types.CallbackQuery, state: FSMContext):
 
     if callback.data == 'back':
-        await callback.message.edit_text(text=Smile.budget + ' Мои расходы.', reply_markup=Keyboard().budget())
+        await callback.message.edit_text(text=Smile.budget + ' Мои расходы.', reply_markup=kb.budget())
         await Page.budget.set()
     else:
         for cat in category:
             if callback.data == cat.name:
-                await callback.message.edit_text(text=text(bold(cat.comment), 'Введите сумму которую потратили и  комментарий (не обязательно).', code('Пример: 100 бутылка воды'), sep='\n\n'), reply_markup=Keyboard().budget_amount())
+                await callback.message.edit_text(text=text(bold(cat.comment), 'Введите сумму которую потратили и комментарий (не обязательно).', code('Пример: 100 бутылка воды'), sep='\n\n'), reply_markup=kb.budget_amount())
 
                 async with state.proxy() as data:
                     data['category'] = cat.name[2:]
@@ -154,7 +168,7 @@ async def budget_add_handler(callback: types.CallbackQuery, state: FSMContext):
 async def budget_category_handler(callback: types.CallbackQuery):
 
     if callback.data == 'back':
-        await callback.message.edit_text(text='Выберите категорию.', reply_markup=Keyboard().budget_category())
+        await callback.message.edit_text(text='Выберите категорию.', reply_markup=kb.budget_category())
         await Page.budget_add.set()
 
     await callback.answer()
@@ -164,13 +178,14 @@ async def budget_category_handler(callback: types.CallbackQuery):
 async def back_handler(callback: types.CallbackQuery):
 
     if callback.data in ['back', 'home']:
-        await callback.message.edit_text(text=Smile.welcome + ' Мои привычки.', reply_markup=Keyboard().welcome())
+        await callback.message.edit_text(text=Smile.welcome + ' Мои привычки.', reply_markup=kb.welcome())
         await Page.first()
         await callback.answer()
 
 
 async def on_startup(dp: Dispatcher):
     await bot.set_webhook(WEBHOOK_URL)
+    await init_app(dp)
 
 
 async def on_shutdown(dp: Dispatcher):
