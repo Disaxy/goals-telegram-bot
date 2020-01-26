@@ -15,7 +15,6 @@ from aiogram.types import ParseMode
 from aiogram.utils.executor import start_webhook
 from aiogram.utils.markdown import bold, code, italic, pre, text
 
-from db import DB
 from google_sheet import Calendar, SpreadSheet
 from keyboards import Keyboard
 from middlewares import AccessMiddleware
@@ -43,12 +42,13 @@ WEBHOOK_URL = f'{WEBHOOK_HOST}{WEBHOOK_PATH}'
 
 logging.basicConfig(level=logging.INFO)
 
+kb = Keyboard([])
 storage = PickleStorage(fsm_path)
 bot = Bot(token=API_TOKEN, proxy=PROXY_URL, parse_mode=ParseMode.MARKDOWN)
 dp = Dispatcher(bot=bot, storage=storage)
 dp.middleware.setup(AccessMiddleware(ADMIN))
-spreadsheets = SpreadSheet(GOOGLE_FILE, GOOGLE_SPREADSHEET_ID)
-calendar = Calendar(GOOGLE_FILE)
+# spreadsheets = SpreadSheet(GOOGLE_FILE, GOOGLE_SPREADSHEET_ID)
+# calendar = Calendar(GOOGLE_FILE)
 
 
 class Page(StatesGroup):
@@ -65,18 +65,6 @@ class Page(StatesGroup):
     settings = State()
 
 
-async def init_app(dp: Dispatcher):
-    db = await DB(db_path, init_path)
-    category = await db.get_categories()
-    kb = Keyboard(category)
-
-    await dp.storage.set_bucket(user=ADMIN, bucket={
-        "db": db,
-        "category": category,
-        "kb": kb
-    })
-
-
 @dp.message_handler(state='*', commands=['start'])
 async def send_welcome(message: types.Message, state: FSMContext):
     await message.answer(text=text(Smile.welcome + ' Мои привычки'), reply_markup=kb.welcome())
@@ -90,7 +78,7 @@ async def send_message(message: types.Message, state: FSMContext):
         amount = message.text.split(' ')[0]
         comment = ' '.join(message.text.split(' ')[1:])
 
-    spreadsheets.append(category=category, amount=amount, comment=comment)
+    # spreadsheets.append(category=category, amount=amount, comment=comment)
 
     await message.answer(text=text('Успешно добавлено ' + bold(amount) + ' рублей в категорию ' + bold(category), 'Вы можете продолжать добавлять расходы в эту категорию или выбрать другую.', sep='\n\n'), reply_markup=kb.budget_success())
 
@@ -115,12 +103,13 @@ async def welcome_handler(callback: types.CallbackQuery):
         await Page.listen.set()
 
     if callback.data == 'regime':
-        calendar.view()
+        # calendar.view()
         await callback.message.edit_text(text=Smile.regime + ' Мой режим дня.', reply_markup=kb.regime())
         await Page.regime.set()
 
     if callback.data == 'budget':
-        status = spreadsheets.view()
+        # status = spreadsheets.view()
+        status = ''
         await callback.message.edit_text(text=text(bold(Smile.budget + ' Мои расходы'), code('\n'.join(status)), sep='\n\n'), reply_markup=kb.budget())
         await Page.budget.set()
 
@@ -152,7 +141,7 @@ async def budget_add_handler(callback: types.CallbackQuery, state: FSMContext):
         await callback.message.edit_text(text=Smile.budget + ' Мои расходы.', reply_markup=kb.budget())
         await Page.budget.set()
     else:
-        for cat in category:
+        for cat in []:
             if callback.data == cat.name:
                 await callback.message.edit_text(text=text(bold(cat.comment), 'Введите сумму которую потратили и комментарий (не обязательно).', code('Пример: 100 бутылка воды'), sep='\n\n'), reply_markup=kb.budget_amount())
 
@@ -185,7 +174,6 @@ async def back_handler(callback: types.CallbackQuery):
 
 async def on_startup(dp: Dispatcher):
     await bot.set_webhook(WEBHOOK_URL)
-    await init_app(dp)
 
 
 async def on_shutdown(dp: Dispatcher):

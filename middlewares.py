@@ -8,7 +8,7 @@ from aiogram.dispatcher.middlewares import BaseMiddleware
 class AccessMiddleware(BaseMiddleware):
 
     def __init__(self, access_id: int):
-        super(AccessMiddleware, self).__init__()
+        super().__init__()
         self.access_id = access_id
 
     async def on_process_message(self, message: types.Message, _):
