@@ -49,7 +49,15 @@ class Keyboard:
 
     def diet(self):
         kb = InlineKeyboardMarkup(row_width=2)
+        calories_btn = InlineKeyboardButton(
+            text=' Калории', callback_data='calories')
+        kb.row(calories_btn)
         kb.add(self.back_btn)
+        return kb
+
+    def diet_calories(self):
+        kb = InlineKeyboardMarkup(row_width=2)
+        kb.add(self.home_btn, self.back_btn)
         return kb
 
     def water(self):
@@ -85,7 +93,7 @@ class Keyboard:
         kb = InlineKeyboardMarkup(row_width=1)
         for cat in self.category:
             kb.add(InlineKeyboardButton(
-                text=cat.name, callback_data=cat.name))
+                text=cat[0], callback_data=cat[0]))
         kb.row(self.home_btn, self.back_btn)
         return kb
 

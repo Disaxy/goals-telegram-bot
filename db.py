@@ -17,57 +17,52 @@ class Expense(NamedTuple):
 class DB:
 
     async def __init__(self, db_path, init_path):
-        self.db_path = db_path
         self.init_path = init_path
+        self.db = await connect(db_path)
         await self.__check_db()
 
     async def __check_db(self):
-        async with connect(self.db_path) as db:
-            async with db.execute('SELECT name FROM `sqlite_master` WHERE type="table" AND name="expense"') as cursor:
-                table_exists = await cursor.fetchall()
-                if not table_exists:
-                    await self.__initialize()
+        async with self.db.execute('SELECT name FROM `sqlite_master` WHERE type="table" AND name="expense"') as cursor:
+            table_exists = await cursor.fetchall()
+            if not table_exists:
+                await self.__initialize()
 
     async def __initialize(self):
         with open(self.init_path, 'r', encoding='utf-8') as file:
             sql = file.read()
 
-        async with connect(self.db_path) as db:
-            await db.executescript(sql)
-            await db.commit()
+            await self.db.executescript(sql)
+            await self.db.commit()
+
+    async def close(self):
+        await self.db.close()
 
     async def view_expense(self):
-        async with connect(self.db_path) as db:
-            async with db.execute('SELECT * FROM `expense`') as cursor:
+        async with self.db.execute('SELECT * FROM `expense`') as cursor:
                 # print(await cursor.fetchall())
-                async for row in cursor:
-                    print(row)
+            async for row in cursor:
+                print(row)
 
     async def last_day(self):
-        async with connect(self.db_path) as db:
-            async with db.execute('SELECT * FROM `expense` WHERE date > datetime("now", "localtime", "-1 day")') as cursor:
-                async for row in cursor:
-                    print(row)
+        async with self.db.execute('SELECT * FROM `expense` WHERE date > datetime("now", "localtime", "-1 day")') as cursor:
+            async for row in cursor:
+                print(row)
 
     async def create_expense(self, expense: Expense):
-        async with connect(self.db_path) as db:
-            await db.execute('INSERT INTO `expense` (category_id, amount, comment, created) VALUES ((SELECT id FROM `category` WHERE name = ?), ?, ?, datetime("now", "localtime"))', (expense.category, expense.amount, expense.comment,))
-            await db.commit()
+        await self.db.execute('INSERT INTO `expense` (category_id, amount, comment, created) VALUES ((SELECT id FROM `category` WHERE name = ?), ?, ?, datetime("now", "localtime"))', (expense.category, expense.amount, expense.comment,))
+        await self.db.commit()
 
     async def remove_expense(self, expense_id: int):
-        async with connect(self.db_path) as db:
-            await db.execute('DELETE FROM `expense` WHERE id = ?', (expense_id,))
-            await db.commit()
+        await self.db.execute('DELETE FROM `expense` WHERE id = ?', (expense_id,))
+        await self.db.commit()
 
     async def remove_last_expense(self):
-        async with connect(self.db_path) as db:
-            await db.execute('DELETE FROM `expense` WHERE id = (SELECT id FROM `expense` ORDER BY id DESC LIMIT 1)')
-            await db.commit()
+        await self.db.execute('DELETE FROM `expense` WHERE id = (SELECT id FROM `expense` ORDER BY id DESC LIMIT 1)')
+        await self.db.commit()
 
-    async def get_categories(self):
-        async with connect(self.db_path) as db:
-            async with db.execute('SELECT name, description FROM `category`') as cursor:
-                return await cursor.fetchall()
+    async def get_categories(self) -> list:
+        async with self.db.execute('SELECT name, description FROM `category`') as cursor:
+            return await cursor.fetchall()
 
 
 async def main():
