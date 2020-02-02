@@ -43,10 +43,13 @@ class DB:
             async for row in cursor:
                 print(row)
 
-    async def last_day(self):
-        async with self.db.execute('SELECT * FROM `expense` WHERE date > datetime("now", "localtime", "-1 day")') as cursor:
-            async for row in cursor:
-                print(row)
+    async def last_day(self) -> list:
+        async with self.db.execute('SELECT * FROM `my_expense` WHERE created >= datetime("now", "localtime", "-1 day")') as cursor:
+            return await cursor.fetchall()
+
+    async def last_month(self) -> list:
+        async with self.db.execute('SELECT * FROM `my_expense` WHERE created > datetime("now", "localtime", "-1 month")') as cursor:
+            return await cursor.fetchall()
 
     async def create_expense(self, expense: Expense):
         await self.db.execute('INSERT INTO `expense` (category_id, amount, comment, created) VALUES ((SELECT id FROM `category` WHERE name = ?), ?, ?, datetime("now", "localtime"))', (expense.category, expense.amount, expense.comment,))

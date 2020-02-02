@@ -9,7 +9,7 @@ from exceptions import NotCorrectMessage
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.files import PickleStorage
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import Text
+from aiogram.dispatcher.filters import RegexpCommandsFilter
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ParseMode
 from aiogram.utils.executor import start_webhook
@@ -62,6 +62,8 @@ class Page(StatesGroup):
     budget = State()
     budget_add = State()
     budget_category = State()
+    budget_last = State()
+    budget_month = State()
     water = State()
     settings = State()
 
@@ -73,7 +75,7 @@ async def send_welcome(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(state=Page.budget_category, content_types=['text'])
-async def send_message(message: types.Message, state: FSMContext):
+async def send_expense(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         category = data.get('category')
         amount = message.text.split(' ')[0]
@@ -86,6 +88,14 @@ async def send_message(message: types.Message, state: FSMContext):
     ))
 
     await message.answer(text=text('Успешно добавлено ' + bold(amount) + ' рублей в категорию ' + bold(category), 'Вы можете продолжать добавлять расходы в эту категорию или выбрать другую.', sep='\n\n'), reply_markup=dp['kb'].budget_success())
+
+
+@dp.message_handler(state=Page.diet_calories, content_types=['text'])
+async def send_weigth(message: types.Message, state: FSMContext):
+    weigth = float(message.text)
+    async with state.proxy() as data:
+        data['weigth'] = weigth
+    await message.answer(text=text(bold('Рассчитайте суточную дозу потребления каллорий'), f'Ваш вес: {weigth}', 'Введите ваш рост', code('Пример: 175.5'), sep='\n\n'))
 
 
 @dp.callback_query_handler(lambda callback: callback.data not in ['home', 'back', 'budget_add'], state=[Page.welcome, Page.budget_category])
@@ -136,10 +146,26 @@ async def budget_handler(callback: types.CallbackQuery):
         await callback.message.edit_text(text='Выберите категорию.', reply_markup=dp['kb'].budget_category())
         await Page.budget_add.set()
 
+    if callback.data == 'bugdet_today':
+        expenses = await dp['db'].last_day()
+        summ = sum([exp[1] for exp in expenses])
+        expense_strings = [str(exp[3]).split(' ')[-1][:-3] + ' - ' + exp[0] + ' - ' + str(exp[1]) + 'р. ' +
+                           ' ' + exp[2] for exp in expenses]
+        await callback.message.edit_text(text=text(bold('Расходы на день'), code(f'Всего: {summ}р.'), '\n'.join(expense_strings), sep='\n\n'), reply_markup=dp['kb'].budget_amount())
+        await Page.budget_last.set()
+
+    if callback.data == 'budget_month':
+        expenses = await dp['db'].last_month()
+        summ = sum([exp[1] for exp in expenses])
+        expense_strings = [exp[3][8:-3] + ' - ' + exp[0] + ' - ' + str(exp[1]) + 'р. ' +
+                           ' ' + exp[2] for exp in expenses]
+        await callback.message.edit_text(text=text(bold('Расходы за месяц'), code(f'Всего: {summ}р.'), '\n'.join(expense_strings), sep='\n\n'), reply_markup=dp['kb'].budget_amount())
+        await Page.budget_month.set()
+
     await callback.answer()
 
 
-@dp.callback_query_handler(lambda callback: callback.data != 'home', state=Page.budget_add)
+@dp.callback_query_handler(lambda callback: callback.data != 'home', state=[Page.budget_add, Page.budget_last, Page.budget_month])
 async def budget_add_handler(callback: types.CallbackQuery, state: FSMContext):
 
     if callback.data == 'back':
